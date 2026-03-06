@@ -1,148 +1,101 @@
-// ConvexProvider — implements IBackendProvider using the Convex SDK.
-// All existing Convex call-sites are preserved here; only the structure changes.
+// Implements IBackendProvider using the Convex SDK.
+// All existing Convex call-sites live here — nowhere else.
 
 import { ConvexClient } from 'convex/browser';
-import { api } from '../../convex/_generated/api';
-// TODO: remove if switching backend provider
-import type { Id } from '../../convex/_generated/dataModel';
+import { ConvexReactClient } from 'convex/react';
+import { createAuthClient } from '@convex-dev/auth/react';
+import Constants from 'expo-constants';
 
 import type { IBackendProvider } from '../IBackendProvider';
-import type {
-  Device,
-  DeviceId,
-  Document,
-  DocumentId,
-  StorageId,
-  Transcription,
-  TranscriptionId,
-  Unsubscribe,
-  UserId,
-} from '../types';
+import type { User, Device, Unsubscribe } from '../types';
 
-const CONVEX_URL = process.env.EXPO_PUBLIC_CONVEX_URL as string;
+// ---------------------------------------------------------------------------
+// Convex-generated API — the only place these paths are referenced
+// ---------------------------------------------------------------------------
+// TODO: remove if switching backend provider
+import { api } from '@/convex/_generated/api';
 
+// ---------------------------------------------------------------------------
+// Convex URL — read from Expo config extra or fall back to env variable
+// ---------------------------------------------------------------------------
+const CONVEX_URL: string =
+  (Constants.expoConfig?.extra?.convexUrl as string | undefined) ??
+  (process.env.EXPO_PUBLIC_CONVEX_URL as string);
+
+if (!CONVEX_URL) {
+  throw new Error(
+    '[ConvexProvider] EXPO_PUBLIC_CONVEX_URL is not set. ' +
+      'Add it to your environment or app.json extra.convexUrl.',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared client instances (singleton per JS context)
+// ---------------------------------------------------------------------------
+// TODO: remove if switching backend provider
+const convexClient = new ConvexReactClient(CONVEX_URL);
+
+// The auth client wraps the same underlying transport so we can call signIn /
+// signOut without a React hook context.
+// TODO: remove if switching backend provider
+const { signIn: _signIn, signOut: _signOut } = createAuthClient(convexClient);
+
+// ---------------------------------------------------------------------------
+// Implementation
+// ---------------------------------------------------------------------------
 export class ConvexProvider implements IBackendProvider {
-  // TODO: remove if switching backend provider
-  private client: ConvexClient;
+  // ── Auth ──────────────────────────────────────────────────────────────────
 
-  constructor() {
-    this.client = new ConvexClient(CONVEX_URL);
+  async signIn(strategy: string, payload?: Record<string, unknown>): Promise<unknown> {
+    // TODO: remove if switching backend provider
+    return _signIn(strategy as Parameters<typeof _signIn>[0], payload as Parameters<typeof _signIn>[1]);
   }
 
-  // ─── Devices ──────────────────────────────────────────────────────────────
-
-  async findDeviceByFingerprint(fingerprint: string): Promise<Device | null> {
-    const result = await this.client.query(api.devices.findDeviceByFingerprint, {
-      fingerprint,
-    });
-    return (result as Device | null) ?? null;
+  async signOut(): Promise<void> {
+    // TODO: remove if switching backend provider
+    return _signOut();
   }
 
-  async storeDevice(fingerprint: string): Promise<DeviceId> {
-    const id = await this.client.mutation(api.devices.storeDevice, {
-      fingerprint,
-    });
-    return id as unknown as DeviceId;
-  }
+  // ── Users ─────────────────────────────────────────────────────────────────
 
-  async updateDeviceWithUserId(
+  subscribeUserByFingerprint(
     fingerprint: string,
-    userId: string
-  ): Promise<DeviceId> {
-    const id = await this.client.mutation(api.devices.updateDeviceWithUserId, {
-      fingerprint,
-      userId,
-    });
-    return id as unknown as DeviceId;
-  }
-
-  // ─── Documents ────────────────────────────────────────────────────────────
-
-  async getDocumentById(documentId: DocumentId): Promise<Document | null> {
-    const result = await this.client.query(api.documents.getDocumentById, {
-      // TODO: remove if switching backend provider
-      documentId: documentId as Id<'documents'>,
-    });
-    return (result as Document | null) ?? null;
-  }
-
-  async getDocumentsByUser(userId: UserId): Promise<Document[]> {
-    const result = await this.client.query(api.documents.getDocumentsByUser, {
-      userId,
-    });
-    return result as Document[];
-  }
-
-  subscribeToDocumentsByUser(
-    userId: UserId,
-    onChange: (documents: Document[]) => void
+    onData: (user: User | null) => void,
   ): Unsubscribe {
     // TODO: remove if switching backend provider
-    const unsubscribe = this.client.onUpdate(
-      api.documents.getDocumentsByUser,
-      { userId },
-      (result) => {
-        onChange((result as Document[]) ?? []);
-      }
+    return convexClient.onUpdate(
+      api.users.getUserByFingerprint,
+      { fingerprint },
+      (value) => onData(value as User | null),
     );
-    return unsubscribe;
   }
 
-  async setCurrentDocId(userId: UserId, docId: DocumentId): Promise<void> {
-    await this.client.mutation(api.documents.setCurrentDocId, {
-      userId,
-      docId,
-    });
-  }
-
-  // ─── Transcriptions ───────────────────────────────────────────────────────
-
-  async saveTranscription(args: {
-    text: string;
-    audioStorageId: string;
-    documentId: string;
-    index?: number;
-  }): Promise<TranscriptionId> {
-    const id = await this.client.mutation(api.transcriptions.saveTranscription, {
-      text: args.text,
-      audioStorageId: args.audioStorageId,
-      documentId: args.documentId,
-      index: args.index,
-    });
-    return id as unknown as TranscriptionId;
-  }
-
-  async getTranscriptions(): Promise<Transcription[]> {
-    const result = await this.client.query(api.transcriptions.getTranscriptions, {});
-    return result as Transcription[];
-  }
-
-  subscribeToTranscriptions(
-    onChange: (transcriptions: Transcription[]) => void
+  subscribeCurrentUser(
+    onData: (user: User | null) => void,
   ): Unsubscribe {
     // TODO: remove if switching backend provider
-    const unsubscribe = this.client.onUpdate(
-      api.transcriptions.getTranscriptions,
+    return convexClient.onUpdate(
+      api.users.getCurrentUser,
       {},
-      (result) => {
-        onChange((result as Transcription[]) ?? []);
-      }
+      (value) => onData(value as User | null),
     );
-    return unsubscribe;
   }
 
-  // ─── Audio / Storage ──────────────────────────────────────────────────────
+  // ── Devices ───────────────────────────────────────────────────────────────
 
-  async generateUploadUrl(): Promise<string> {
-    const url = await this.client.mutation(api.transcriptions.generateUploadUrl, {});
-    return url as string;
-  }
-
-  async transcribeAudio(storageId: StorageId): Promise<string> {
-    const text = await this.client.action(api.transcribe.transcribeAudio, {
-      // TODO: remove if switching backend provider
-      storageId: storageId as Id<'_storage'>,
-    });
-    return text as string;
+  subscribeDeviceByFingerprint(
+    fingerprint: string,
+    onData: (device: Device | null | undefined) => void,
+  ): Unsubscribe {
+    // TODO: remove if switching backend provider
+    return convexClient.onUpdate(
+      api.devices.findDeviceByFingerprint,
+      { fingerprint },
+      (value) => {
+        // Convex onUpdate delivers `undefined` only before the first result;
+        // after that it is null (not found) or a document.
+        onData(value as Device | null | undefined);
+      },
+    );
   }
 }
