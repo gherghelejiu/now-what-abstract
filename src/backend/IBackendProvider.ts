@@ -1,116 +1,70 @@
-/**
- * Provider-agnostic backend interface.
- * No convex/* imports are allowed in this file.
- */
+// Provider interface — one method per logical operation.
+// No imports from 'convex/*' allowed here.
 
 import type {
+  Device,
+  DeviceId,
+  Document,
+  DocumentId,
+  StorageId,
+  Transcription,
+  TranscriptionId,
   Unsubscribe,
-  User,
-  Task,
-  CreateTaskParams,
-  UpdateTaskParams,
-  Recording,
-  CreateRecordingParams,
-  UploadUrlResult,
+  UserId,
 } from './types';
 
 export interface IBackendProvider {
-  // ─── Auth ──────────────────────────────────────────────────────────────────
+  // ─── Devices ────────────────────────────────────────────────────────────────
 
-  /**
-   * Sign in with the given provider / credentials.
-   * Returns whatever the underlying auth system gives back.
-   */
-  signIn(provider: string, params: Record<string, unknown>): Promise<unknown>;
+  /** Find a device record by its fingerprint. Returns null if not found. */
+  findDeviceByFingerprint(fingerprint: string): Promise<Device | null>;
 
-  /**
-   * Sign out the current user.
-   */
-  signOut(): Promise<void>;
+  /** Store a new device (or return existing id if already stored). */
+  storeDevice(fingerprint: string): Promise<DeviceId>;
 
-  /**
-   * Subscribe to the currently authenticated user.
-   * Calls `onData` immediately with the current value, then on every change.
-   */
-  subscribeCurrentUser(
-    onData: (user: User | null) => void,
-    onError?: (error: Error) => void,
+  /** Associate a device fingerprint with a user id. */
+  updateDeviceWithUserId(fingerprint: string, userId: string): Promise<DeviceId>;
+
+  // ─── Documents ──────────────────────────────────────────────────────────────
+
+  /** Fetch a single document by its id. */
+  getDocumentById(documentId: DocumentId): Promise<Document | null>;
+
+  /** Fetch all documents belonging to a user, ordered newest-first. */
+  getDocumentsByUser(userId: UserId): Promise<Document[]>;
+
+  /** Subscribe to all documents for a user. Calls onChange whenever the list changes. */
+  subscribeToDocumentsByUser(
+    userId: UserId,
+    onChange: (documents: Document[]) => void
   ): Unsubscribe;
 
-  // ─── Tasks ─────────────────────────────────────────────────────────────────
+  /** Set the currently-active document id on a user record. */
+  setCurrentDocId(userId: UserId, docId: DocumentId): Promise<void>;
 
-  /**
-   * Subscribe to the current user's task list.
-   */
-  subscribeTasks(
-    onData: (tasks: Task[]) => void,
-    onError?: (error: Error) => void,
+  // ─── Transcriptions ─────────────────────────────────────────────────────────
+
+  /** Persist a transcription record and return its new id. */
+  saveTranscription(args: {
+    text: string;
+    audioStorageId: string;
+    documentId: string;
+    index?: number;
+  }): Promise<TranscriptionId>;
+
+  /** Fetch all transcriptions ordered newest-first. */
+  getTranscriptions(): Promise<Transcription[]>;
+
+  /** Subscribe to all transcriptions. Calls onChange whenever data changes. */
+  subscribeToTranscriptions(
+    onChange: (transcriptions: Transcription[]) => void
   ): Unsubscribe;
 
-  /**
-   * Fetch tasks once (non-reactive).
-   */
-  getTasks(): Promise<Task[]>;
+  // ─── Audio / Storage ────────────────────────────────────────────────────────
 
-  /**
-   * Fetch a single task by id.
-   */
-  getTask(id: string): Promise<Task | null>;
+  /** Request a short-lived upload URL for storing an audio file. */
+  generateUploadUrl(): Promise<string>;
 
-  /**
-   * Create a new task.
-   */
-  createTask(params: CreateTaskParams): Promise<string>;
-
-  /**
-   * Update an existing task.
-   */
-  updateTask(params: UpdateTaskParams): Promise<void>;
-
-  /**
-   * Delete a task by id.
-   */
-  deleteTask(id: string): Promise<void>;
-
-  /**
-   * Mark a task as complete / incomplete.
-   */
-  toggleTask(id: string, completed: boolean): Promise<void>;
-
-  // ─── Recordings ────────────────────────────────────────────────────────────
-
-  /**
-   * Subscribe to the current user's recordings list.
-   */
-  subscribeRecordings(
-    onData: (recordings: Recording[]) => void,
-    onError?: (error: Error) => void,
-  ): Unsubscribe;
-
-  /**
-   * Fetch recordings once (non-reactive).
-   */
-  getRecordings(): Promise<Recording[]>;
-
-  /**
-   * Create a recording record after the file has been uploaded.
-   */
-  createRecording(params: CreateRecordingParams): Promise<string>;
-
-  /**
-   * Delete a recording by id.
-   */
-  deleteRecording(id: string): Promise<void>;
-
-  /**
-   * Get a short-lived serving URL for a stored file.
-   */
-  getFileUrl(storageId: string): Promise<string | null>;
-
-  // ─── Storage / Upload ──────────────────────────────────────────────────────
-
-  /**
-   * Request a pre-signed upload URL from the backend.
-   */
-  generateUploadUrl(): Promise<UploadUrlResult>;
+  /** Trigger server-side transcription of an already-uploaded audio file. */
+  transcribeAudio(storageId: StorageId): Promise<string>;
 }

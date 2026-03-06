@@ -1,89 +1,58 @@
-/**
- * Shared domain types / DTOs.
- * No provider-specific imports allowed in this file.
- */
+// Shared domain types / DTOs — no provider-specific imports
 
-export type Unsubscribe = () => void;
+export type DeviceId = string;
+export type UserId = string;
+export type DocumentId = string;
+export type TranscriptionId = string;
+export type StorageId = string;
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
-
-export interface SignInParams {
-  provider: string;
-  [key: string]: unknown;
+export interface Device {
+  _id: DeviceId;
+  fingerprint: string;
+  userId?: string;
+  createdAt: number;
 }
 
-export interface SignOutParams {
-  [key: string]: unknown;
+export interface Document {
+  _id: DocumentId;
+  title: string;
+  userId: string;
+  description?: string;
+  transcriptions: string[];
+  transcriptionIds: string[];
+  createdAt: number;
 }
 
-// ─── User ────────────────────────────────────────────────────────────────────
+export interface Transcription {
+  _id: TranscriptionId;
+  text: string;
+  audioStorageId: string;
+  documentId: string;
+  indexInDocument?: number;
+  createdAt: number;
+}
 
 export interface User {
-  _id: string;
-  _creationTime: number;
+  _id: UserId;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
+  phone?: string;
   image?: string;
-  [key: string]: unknown;
+  coverImage?: string;
+  emailVerificationTime?: number;
+  phoneVerificationTime?: number;
+  isAnonymous?: boolean;
+  color?: string;
+  theme?: string;
+  lastSeen?: number;
+  fingerprint?: string;
+  username?: string;
+  usernameLowercase?: string;
+  currentDocumentId?: string;
+  minutesLeft?: number;
 }
 
-// ─── Task / Item (generic "now-what" domain) ─────────────────────────────────
-
-export interface Task {
-  _id: string;
-  _creationTime: number;
-  userId: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  completedAt?: number;
-  dueDate?: number;
-  priority?: number;
-  tags?: string[];
-  [key: string]: unknown;
-}
-
-export interface CreateTaskParams {
-  title: string;
-  description?: string;
-  dueDate?: number;
-  priority?: number;
-  tags?: string[];
-}
-
-export interface UpdateTaskParams {
-  id: string;
-  title?: string;
-  description?: string;
-  completed?: boolean;
-  dueDate?: number;
-  priority?: number;
-  tags?: string[];
-}
-
-// ─── Recording / Voice Note ───────────────────────────────────────────────────
-
-export interface Recording {
-  _id: string;
-  _creationTime: number;
-  userId: string;
-  title?: string;
-  storageId: string;
-  url?: string;
-  durationMs?: number;
-  transcript?: string;
-  [key: string]: unknown;
-}
-
-export interface CreateRecordingParams {
-  storageId: string;
-  title?: string;
-  durationMs?: number;
-}
-
-// ─── Upload ──────────────────────────────────────────────────────────────────
-
-export interface UploadUrlResult {
-  uploadUrl: string;
-  storageId?: string;
-}
+/** Unsubscribe function returned by real-time subscription methods */
+export type Unsubscribe = () => void;

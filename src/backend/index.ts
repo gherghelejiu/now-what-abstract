@@ -1,21 +1,20 @@
-/**
- * Active backend provider.
- *
- * To switch providers:
- *   1. Implement IBackendProvider in a new directory (e.g. src/backend/firebase/).
- *   2. Change the import below to point at the new provider's index.ts.
- *   3. Delete (or keep) the convex/ directory — nothing else in the app needs to change.
- */
+// Re-exports the active backend provider.
+// To swap providers, change the import below to point at a different implementation.
 
-export { default } from './convex/index';
+import backend from './convex';
+
+export default backend;
+
 export type { IBackendProvider } from './IBackendProvider';
 export type {
+  Device,
+  DeviceId,
+  Document,
+  DocumentId,
+  StorageId,
+  Transcription,
+  TranscriptionId,
   Unsubscribe,
+  UserId,
   User,
-  Task,
-  CreateTaskParams,
-  UpdateTaskParams,
-  Recording,
-  CreateRecordingParams,
-  UploadUrlResult,
 } from './types';

@@ -25,3 +25,10 @@ export const getTranscriptions = query({
     return await ctx.db.query("transcriptions").order("desc").collect();
   },
 });
+
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
