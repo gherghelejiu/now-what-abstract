@@ -1,11 +1,13 @@
 {
   "started_at": "2026-03-06T08:30:44.950040+00:00",
-  "updated_at": "2026-03-06T08:31:53.451983+00:00",
+  "updated_at": "2026-03-06T08:35:27.252789+00:00",
   "source_repo": "",
   "completed_steps": [
     "source_copied",
     "scaffold"
   ],
-  "completed_batches": [],
+  "completed_batches": [
+    0
+  ],
   "total_batches": 4
 }

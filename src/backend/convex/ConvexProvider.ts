@@ -1,192 +1,204 @@
-import { ConvexReactClient } from 'convex/react';
-import * as SecureStore from 'expo-secure-store';
+/**
+ * Convex implementation of IBackendProvider.
+ *
+ * All Convex SDK calls are confined to this file.
+ * Swap this file (and index.ts) to switch providers.
+ */
 
-// TODO: remove if switching backend provider
-import { ConvexAuthClient } from '@convex-dev/auth/react';
-// TODO: remove if switching backend provider
-import { api } from '@/convex/_generated/api';
+import { ConvexReactClient } from 'convex/react'; // TODO: remove if switching backend provider
+import { ConvexClient } from 'convex/browser';    // TODO: remove if switching backend provider
+import { api } from '../../convex/_generated/api'; // TODO: remove if switching backend provider
 
 import type { IBackendProvider } from '../IBackendProvider';
 import type {
-  Document,
-  GetDocumentByIdParams,
-  GetDocumentsByUserParams,
-  SaveTranscriptionParams,
-  SetCurrentDocIdParams,
-  SignInParams,
-  SignInResult,
   Unsubscribe,
   User,
+  Task,
+  CreateTaskParams,
+  UpdateTaskParams,
+  Recording,
+  CreateRecordingParams,
+  UploadUrlResult,
 } from '../types';
 
-// ─── Secure storage adapter (same as in _layout.tsx) ─────────────────────────
+const CONVEX_URL = 'https://brave-roadrunner-570.convex.cloud';
 
-const secureStorage = {
-  getItem: async (key: string): Promise<string | null> => {
-    try {
-      const value = await SecureStore.getItemAsync(key);
-      console.log('🔵 SecureStore getItem:', key, value ? 'has value' : 'null');
-      return value;
-    } catch (e) {
-      console.error('🔴 SecureStore getItem error:', e);
-      return null;
-    }
-  },
-  setItem: async (key: string, value: string): Promise<void> => {
-    try {
-      await SecureStore.setItemAsync(key, value);
-      console.log('🔵 SecureStore setItem:', key, 'stored successfully');
-    } catch (e) {
-      console.error('🔴 SecureStore setItem error:', e);
-    }
-  },
-  removeItem: async (key: string): Promise<void> => {
-    try {
-      await SecureStore.deleteItemAsync(key);
-      console.log('🔵 SecureStore removeItem:', key, 'removed successfully');
-    } catch (e) {
-      console.error('🔴 SecureStore removeItem error:', e);
-    }
-  },
-};
-
-// ─── ConvexProvider ───────────────────────────────────────────────────────────
-
-export class ConvexBackendProvider implements IBackendProvider {
+/**
+ * Thin, stateful wrapper around the Convex React/Browser clients.
+ *
+ * • `ConvexReactClient` is used for React-hook-style subscriptions
+ *   (we drive it manually via `onUpdate`).
+ * • `ConvexClient` is used for one-shot queries / mutations / actions
+ *   when we need a plain Promise.
+ */
+export class ConvexProvider implements IBackendProvider {
   // TODO: remove if switching backend provider
-  readonly convexClient: ConvexReactClient;
+  private readonly reactClient: ConvexReactClient;
   // TODO: remove if switching backend provider
-  readonly authClient: ConvexAuthClient;
+  private readonly client: ConvexClient;
 
   constructor() {
-    const url = process.env.EXPO_PUBLIC_CONVEX_URL!;
-    this.convexClient = new ConvexReactClient(url);
+    this.reactClient = new ConvexReactClient(CONVEX_URL);
+    this.client = new ConvexClient(CONVEX_URL);
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Generic subscription helper using ConvexClient.onUpdate.
+   * Returns an unsubscribe function.
+   */
+  private subscribe<T>(
+    query: unknown,
+    args: Record<string, unknown>,
+    onData: (data: T) => void,
+    onError?: (error: Error) => void,
+  ): Unsubscribe {
     // TODO: remove if switching backend provider
-    this.authClient = new ConvexAuthClient(this.convexClient, secureStorage);
+    const unsubscribe = (this.client as any).onUpdate(
+      query,
+      args,
+      (value: T) => {
+        onData(value);
+      },
+    );
+
+    // ConvexClient.onUpdate doesn't expose per-subscription error callbacks;
+    // errors surface on the client-level event. We attach a one-time listener
+    // so callers can handle them.
+    if (onError) {
+      const handler = (event: { errorMessage: string }) => {
+        onError(new Error(event.errorMessage));
+      };
+      (this.client as any).on?.('error', handler);
+    }
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
-  async signIn(provider: 'password', params: SignInParams): Promise<SignInResult> {
+  async signIn(provider: string, params: Record<string, unknown>): Promise<unknown> {
     // TODO: remove if switching backend provider
-    const result = await this.authClient.signIn(provider, {
-      flow: params.flow,
-      password: params.password,
-      username: params.username,
-      email: params.email,
-      fingerprint: params.fingerprint,
-    } as Record<string, unknown>);
-    return (result ?? {}) as SignInResult;
+    // @convex-dev/auth exposes signIn through the React client's auth helpers.
+    // We call it via action so the provider remains non-React.
+    return this.client.action(
+      (api as any).auth.signIn,
+      { provider, params },
+    );
   }
 
   async signOut(): Promise<void> {
     // TODO: remove if switching backend provider
-    await this.authClient.signOut();
+    await this.client.action((api as any).auth.signOut, {});
   }
 
-  // ─── Users ─────────────────────────────────────────────────────────────────
-
-  async getCurrentUser(): Promise<User | null> {
+  subscribeCurrentUser(
+    onData: (user: User | null) => void,
+    onError?: (error: Error) => void,
+  ): Unsubscribe {
     // TODO: remove if switching backend provider
-    const result = await this.convexClient.query(api.users.getCurrentUser, {});
-    if (!result) return null;
-    return result as unknown as User;
-  }
-
-  subscribeCurrentUser(callback: (user: User | null) => void): Unsubscribe {
-    // TODO: remove if switching backend provider
-    const unwatch = this.convexClient.onUpdate(
-      api.users.getCurrentUser,
+    return this.subscribe<User | null>(
+      (api as any).users.getCurrentUser,
       {},
-      (value) => {
-        callback(value ? (value as unknown as User) : null);
-      }
+      onData,
+      onError,
     );
-    return unwatch;
   }
 
-  // ─── Documents ─────────────────────────────────────────────────────────────
+  // ─── Tasks ─────────────────────────────────────────────────────────────────
 
-  async getDocumentsByUser(params: GetDocumentsByUserParams): Promise<Document[]> {
-    // TODO: remove if switching backend provider
-    const result = await this.convexClient.query(api.documents.getDocumentsByUser, {
-      userId: params.userId as any,
-    });
-    return (result ?? []) as unknown as Document[];
-  }
-
-  subscribeDocumentsByUser(
-    params: GetDocumentsByUserParams,
-    callback: (docs: Document[]) => void
+  subscribeTasks(
+    onData: (tasks: Task[]) => void,
+    onError?: (error: Error) => void,
   ): Unsubscribe {
     // TODO: remove if switching backend provider
-    const unwatch = this.convexClient.onUpdate(
-      api.documents.getDocumentsByUser,
-      { userId: params.userId as any },
-      (value) => {
-        callback((value ?? []) as unknown as Document[]);
-      }
+    return this.subscribe<Task[]>(
+      (api as any).tasks.list,
+      {},
+      (data) => onData(data ?? []),
+      onError,
     );
-    return unwatch;
   }
 
-  async getDocumentById(params: GetDocumentByIdParams): Promise<Document | null> {
+  async getTasks(): Promise<Task[]> {
     // TODO: remove if switching backend provider
-    const result = await this.convexClient.query(api.documents.getDocumentById, {
-      documentId: params.documentId as any,
-    });
-    if (!result) return null;
-    return result as unknown as Document;
+    const result = await this.client.query((api as any).tasks.list, {});
+    return result ?? [];
   }
 
-  subscribeDocumentById(
-    params: GetDocumentByIdParams,
-    callback: (doc: Document | null) => void
+  async getTask(id: string): Promise<Task | null> {
+    // TODO: remove if switching backend provider
+    return this.client.query((api as any).tasks.get, { id });
+  }
+
+  async createTask(params: CreateTaskParams): Promise<string> {
+    // TODO: remove if switching backend provider
+    return this.client.mutation((api as any).tasks.create, params);
+  }
+
+  async updateTask(params: UpdateTaskParams): Promise<void> {
+    // TODO: remove if switching backend provider
+    const { id, ...fields } = params;
+    await this.client.mutation((api as any).tasks.update, { id, ...fields });
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    // TODO: remove if switching backend provider
+    await this.client.mutation((api as any).tasks.remove, { id });
+  }
+
+  async toggleTask(id: string, completed: boolean): Promise<void> {
+    // TODO: remove if switching backend provider
+    await this.client.mutation((api as any).tasks.toggle, { id, completed });
+  }
+
+  // ─── Recordings ────────────────────────────────────────────────────────────
+
+  subscribeRecordings(
+    onData: (recordings: Recording[]) => void,
+    onError?: (error: Error) => void,
   ): Unsubscribe {
     // TODO: remove if switching backend provider
-    const unwatch = this.convexClient.onUpdate(
-      api.documents.getDocumentById,
-      { documentId: params.documentId as any },
-      (value) => {
-        callback(value ? (value as unknown as Document) : null);
-      }
+    return this.subscribe<Recording[]>(
+      (api as any).recordings.list,
+      {},
+      (data) => onData(data ?? []),
+      onError,
     );
-    return unwatch;
   }
 
-  async setCurrentDocId(params: SetCurrentDocIdParams): Promise<void> {
+  async getRecordings(): Promise<Recording[]> {
     // TODO: remove if switching backend provider
-    await this.convexClient.mutation(api.documents.setCurrentDocId, {
-      userId: params.userId as any,
-      docId: params.docId,
-    });
+    const result = await this.client.query((api as any).recordings.list, {});
+    return result ?? [];
   }
 
-  // ─── Storage ───────────────────────────────────────────────────────────────
-
-  async generateUploadUrl(): Promise<string> {
+  async createRecording(params: CreateRecordingParams): Promise<string> {
     // TODO: remove if switching backend provider
-    const url = await this.convexClient.mutation(api.storage.generateUploadUrl, {});
-    return url as string;
+    return this.client.mutation((api as any).recordings.create, params);
   }
 
-  // ─── Transcriptions ────────────────────────────────────────────────────────
-
-  async transcribeAudio(params: { storageId: string }): Promise<string> {
+  async deleteRecording(id: string): Promise<void> {
     // TODO: remove if switching backend provider
-    const text = await this.convexClient.action(api.transcribe.transcribeAudio, {
-      storageId: params.storageId as any,
-    });
-    return text as string;
+    await this.client.mutation((api as any).recordings.remove, { id });
   }
 
-  async saveTranscription(params: SaveTranscriptionParams): Promise<void> {
+  async getFileUrl(storageId: string): Promise<string | null> {
     // TODO: remove if switching backend provider
-    await this.convexClient.mutation(api.transcriptions.saveTranscription, {
-      audioStorageId: params.audioStorageId as any,
-      text: params.text,
-      documentId: params.documentId as any,
-      index: params.index,
-    });
+    return this.client.query((api as any).recordings.getUrl, { storageId });
+  }
+
+  // ─── Storage / Upload ──────────────────────────────────────────────────────
+
+  async generateUploadUrl(): Promise<UploadUrlResult> {
+    // TODO: remove if switching backend provider
+    const uploadUrl = await this.client.mutation(
+      (api as any).recordings.generateUploadUrl,
+      {},
+    );
+    return { uploadUrl };
   }
 }

@@ -1,3 +1,5 @@
-import { ConvexBackendProvider } from './ConvexProvider';
+import { ConvexProvider } from './ConvexProvider';
 
-export default new ConvexBackendProvider();
+const provider = new ConvexProvider();
+
+export default provider;

@@ -1,94 +1,116 @@
-// Provider interface — no convex/* imports
+/**
+ * Provider-agnostic backend interface.
+ * No convex/* imports are allowed in this file.
+ */
 
 import type {
-  Document,
-  GetDocumentByIdParams,
-  GetDocumentsByUserParams,
-  SaveTranscriptionParams,
-  SetCurrentDocIdParams,
-  SignInParams,
-  SignInResult,
-  Transcription,
   Unsubscribe,
   User,
+  Task,
+  CreateTaskParams,
+  UpdateTaskParams,
+  Recording,
+  CreateRecordingParams,
+  UploadUrlResult,
 } from './types';
 
 export interface IBackendProvider {
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
   /**
-   * Sign in or sign up with the password provider.
+   * Sign in with the given provider / credentials.
+   * Returns whatever the underlying auth system gives back.
    */
-  signIn(provider: 'password', params: SignInParams): Promise<SignInResult>;
+  signIn(provider: string, params: Record<string, unknown>): Promise<unknown>;
 
   /**
    * Sign out the current user.
    */
   signOut(): Promise<void>;
 
-  // ─── Users ─────────────────────────────────────────────────────────────────
-
-  /**
-   * Fetch the currently authenticated user once.
-   */
-  getCurrentUser(): Promise<User | null>;
-
   /**
    * Subscribe to the currently authenticated user.
-   * Calls `callback` whenever the value changes.
-   * Returns an unsubscribe function.
+   * Calls `onData` immediately with the current value, then on every change.
    */
-  subscribeCurrentUser(callback: (user: User | null) => void): Unsubscribe;
+  subscribeCurrentUser(
+    onData: (user: User | null) => void,
+    onError?: (error: Error) => void,
+  ): Unsubscribe;
 
-  // ─── Documents ─────────────────────────────────────────────────────────────
-
-  /**
-   * Fetch all documents belonging to a user.
-   */
-  getDocumentsByUser(params: GetDocumentsByUserParams): Promise<Document[]>;
+  // ─── Tasks ─────────────────────────────────────────────────────────────────
 
   /**
-   * Subscribe to documents belonging to a user.
+   * Subscribe to the current user's task list.
    */
-  subscribeDocumentsByUser(
-    params: GetDocumentsByUserParams,
-    callback: (docs: Document[]) => void
+  subscribeTasks(
+    onData: (tasks: Task[]) => void,
+    onError?: (error: Error) => void,
   ): Unsubscribe;
 
   /**
-   * Fetch a single document by its ID.
+   * Fetch tasks once (non-reactive).
    */
-  getDocumentById(params: GetDocumentByIdParams): Promise<Document | null>;
+  getTasks(): Promise<Task[]>;
 
   /**
-   * Subscribe to a single document by its ID.
+   * Fetch a single task by id.
    */
-  subscribeDocumentById(
-    params: GetDocumentByIdParams,
-    callback: (doc: Document | null) => void
+  getTask(id: string): Promise<Task | null>;
+
+  /**
+   * Create a new task.
+   */
+  createTask(params: CreateTaskParams): Promise<string>;
+
+  /**
+   * Update an existing task.
+   */
+  updateTask(params: UpdateTaskParams): Promise<void>;
+
+  /**
+   * Delete a task by id.
+   */
+  deleteTask(id: string): Promise<void>;
+
+  /**
+   * Mark a task as complete / incomplete.
+   */
+  toggleTask(id: string, completed: boolean): Promise<void>;
+
+  // ─── Recordings ────────────────────────────────────────────────────────────
+
+  /**
+   * Subscribe to the current user's recordings list.
+   */
+  subscribeRecordings(
+    onData: (recordings: Recording[]) => void,
+    onError?: (error: Error) => void,
   ): Unsubscribe;
 
   /**
-   * Set the current active document for a user.
+   * Fetch recordings once (non-reactive).
    */
-  setCurrentDocId(params: SetCurrentDocIdParams): Promise<void>;
-
-  // ─── Storage ───────────────────────────────────────────────────────────────
+  getRecordings(): Promise<Recording[]>;
 
   /**
-   * Generate a pre-signed upload URL for audio storage.
+   * Create a recording record after the file has been uploaded.
    */
-  generateUploadUrl(): Promise<string>;
-
-  // ─── Transcriptions ────────────────────────────────────────────────────────
+  createRecording(params: CreateRecordingParams): Promise<string>;
 
   /**
-   * Run the transcription action on an uploaded audio file.
+   * Delete a recording by id.
    */
-  transcribeAudio(params: { storageId: string }): Promise<string>;
+  deleteRecording(id: string): Promise<void>;
 
   /**
-   * Persist a completed transcription.
+   * Get a short-lived serving URL for a stored file.
    */
-  saveTranscription(params: SaveTranscriptionParams): Promise<void>;
+  getFileUrl(storageId: string): Promise<string | null>;
+
+  // ─── Storage / Upload ──────────────────────────────────────────────────────
+
+  /**
+   * Request a pre-signed upload URL from the backend.
+   */
+  generateUploadUrl(): Promise<UploadUrlResult>;
 }

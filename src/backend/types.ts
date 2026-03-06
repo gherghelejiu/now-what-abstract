@@ -1,82 +1,89 @@
-// Shared domain types / DTOs — no provider imports
+/**
+ * Shared domain types / DTOs.
+ * No provider-specific imports allowed in this file.
+ */
 
 export type Unsubscribe = () => void;
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+export interface SignInParams {
+  provider: string;
+  [key: string]: unknown;
+}
+
+export interface SignOutParams {
+  [key: string]: unknown;
+}
 
 // ─── User ────────────────────────────────────────────────────────────────────
 
 export interface User {
   _id: string;
-  _creationTime?: number;
-  email?: string;
+  _creationTime: number;
   name?: string;
-  isAnonymous?: boolean;
-  minutesLeft?: number;
-  currentDocumentId?: string;
-}
-
-// ─── Document ────────────────────────────────────────────────────────────────
-
-export interface Document {
-  _id: string;
-  _creationTime?: number;
-  title: string;
-  userId?: string;
-}
-
-// ─── Transcription ───────────────────────────────────────────────────────────
-
-export interface Transcription {
-  _id: string;
-  audioStorageId: string;
-  text: string;
-  documentId: string;
-  index: number;
-}
-
-// ─── Auth ────────────────────────────────────────────────────────────────────
-
-export interface SignInParams {
-  flow: 'signIn' | 'signUp';
-  password: string;
-  username: string;
-  email: string;
-  fingerprint: string;
-}
-
-export interface SignInResult {
-  redirect?: string;
-  verifier?: string;
+  email?: string;
+  image?: string;
   [key: string]: unknown;
 }
 
-// ─── Storage ─────────────────────────────────────────────────────────────────
+// ─── Task / Item (generic "now-what" domain) ─────────────────────────────────
 
-export interface GenerateUploadUrlResult {
-  uploadUrl: string;
+export interface Task {
+  _id: string;
+  _creationTime: number;
+  userId: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  completedAt?: number;
+  dueDate?: number;
+  priority?: number;
+  tags?: string[];
+  [key: string]: unknown;
 }
 
-// ─── Transcribe ──────────────────────────────────────────────────────────────
+export interface CreateTaskParams {
+  title: string;
+  description?: string;
+  dueDate?: number;
+  priority?: number;
+  tags?: string[];
+}
 
-export interface TranscribeAudioParams {
+export interface UpdateTaskParams {
+  id: string;
+  title?: string;
+  description?: string;
+  completed?: boolean;
+  dueDate?: number;
+  priority?: number;
+  tags?: string[];
+}
+
+// ─── Recording / Voice Note ───────────────────────────────────────────────────
+
+export interface Recording {
+  _id: string;
+  _creationTime: number;
+  userId: string;
+  title?: string;
   storageId: string;
+  url?: string;
+  durationMs?: number;
+  transcript?: string;
+  [key: string]: unknown;
 }
 
-export interface SaveTranscriptionParams {
-  audioStorageId: string;
-  text: string;
-  documentId: string;
-  index: number;
+export interface CreateRecordingParams {
+  storageId: string;
+  title?: string;
+  durationMs?: number;
 }
 
-export interface SetCurrentDocIdParams {
-  userId: string;
-  docId: string;
-}
+// ─── Upload ──────────────────────────────────────────────────────────────────
 
-export interface GetDocumentsByUserParams {
-  userId: string;
-}
-
-export interface GetDocumentByIdParams {
-  documentId: string;
+export interface UploadUrlResult {
+  uploadUrl: string;
+  storageId?: string;
 }
