@@ -11,30 +11,41 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useEffect } from 'react';
 
 import TranscriberView from '@/components/transcriber/TranscriberView';
-import { api } from '@/convex/_generated/api';
 import { getDeviceFingerprint } from '@/utils/device';
+
+// TODO: remove if switching backend provider
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useQuery } from 'convex/react';
+
+import backend from '../../src/backend';
+import type { User } from '../../src/backend';
 
 export default function HomeScreen() {
-  
+
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [docModalVisible, setDocModalVisible] = useState(false);
-  
+
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
 
-  const { signIn } = useAuthActions();
-  // const { isAuthenticated } = useConvexAuth();
-  // console.log('isAuthenticated: ', isAuthenticated);
-  const user = useQuery(api.users.getCurrentUser);
-  console.log('user from query: ', JSON.stringify(user));
+  const [user, setUser] = useState<User | null | undefined>(undefined);
 
+  // TODO: remove if switching backend provider
+  const { signIn } = useAuthActions();
+
+  // Subscribe to the current user via the backend abstraction
+  useEffect(() => {
+    const unsubscribe = backend.subscribeCurrentUser((u) => {
+      setUser(u);
+      console.log('user from query: ', JSON.stringify(u));
+    });
+    return unsubscribe;
+  }, []);
 
   const handleCreateDoc = () => {
     setDocModalVisible(true);
@@ -48,7 +59,7 @@ export default function HomeScreen() {
   const handleSubmit = async () => {
     console.log({ authMode, email, password });
     if (!email || !password) {
-      Alert.alert("Error", "Email and password are required");
+      Alert.alert('Error', 'Email and password are required');
       return;
     }
 
@@ -57,17 +68,20 @@ export default function HomeScreen() {
     try {
       const fingerprint = await getDeviceFingerprint();
 
+      // TODO: remove if switching backend provider
+      // useAuthActions().signIn is used here because @convex-dev/auth
+      // hooks into the React context for token management. Replace with
+      // backend.signIn() when migrating away from Convex auth.
       await signIn('password', {
         flow: authMode === 'signup' ? 'signUp' : 'signIn',
         password,
         username: email,
         email,
         fingerprint,
-        // loginType: 'email',
       });
     } catch (error: any) {
       console.log('');
-      Alert.alert("Registration Failed", error.message ?? "Something went wrong");
+      Alert.alert('Registration Failed', error.message ?? 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -131,13 +145,15 @@ export default function HomeScreen() {
               secureTextEntry
             />
 
-            {loading ? <View>
-              
-            </View> : <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>
-                {authMode === 'login' ? 'Sign In' : 'Create Account'}
-              </Text>
-            </TouchableOpacity>}
+            {loading ? (
+              <View />
+            ) : (
+              <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+                <Text style={styles.buttonText}>
+                  {authMode === 'login' ? 'Sign In' : 'Create Account'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.switchMode}
@@ -170,7 +186,6 @@ export default function HomeScreen() {
         >
           {/* Backdrop */}
           <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseDocModal} />
-
         </KeyboardAvoidingView>
       </Modal>
     </View>

@@ -1,112 +1,82 @@
-/**
- * Shared domain types / DTOs.
- * No provider-specific imports allowed here.
- */
+// Shared domain types / DTOs — no provider imports
 
-// ---------------------------------------------------------------------------
-// Primitive aliases
-// ---------------------------------------------------------------------------
+export type Unsubscribe = () => void;
 
-/** Opaque string ID – matches Convex's GenericId at runtime. */
-export type ID = string;
-
-// ---------------------------------------------------------------------------
-// Domain entities
-// ---------------------------------------------------------------------------
+// ─── User ────────────────────────────────────────────────────────────────────
 
 export interface User {
-  _id: ID;
-  _creationTime: number;
-  name?: string;
-  firstName?: string;
-  lastName?: string;
+  _id: string;
+  _creationTime?: number;
   email?: string;
-  phone?: string;
-  image?: string;
-  coverImage?: string;
-  emailVerificationTime?: number;
-  phoneVerificationTime?: number;
+  name?: string;
   isAnonymous?: boolean;
-  color?: string;
-  theme?: string;
-  lastSeen?: number;
-  fingerprint?: string;
-  username?: string;
-  usernameLowercase?: string;
-  currentDocumentId?: string;
   minutesLeft?: number;
+  currentDocumentId?: string;
 }
+
+// ─── Document ────────────────────────────────────────────────────────────────
 
 export interface Document {
-  _id: ID;
-  _creationTime: number;
+  _id: string;
+  _creationTime?: number;
   title: string;
-  userId: string;
-  description?: string;
-  transcriptions: string[];
-  transcriptionIds: string[];
-  createdAt: number;
+  userId?: string;
 }
+
+// ─── Transcription ───────────────────────────────────────────────────────────
 
 export interface Transcription {
-  _id: ID;
-  _creationTime: number;
-  text: string;
+  _id: string;
   audioStorageId: string;
+  text: string;
   documentId: string;
-  indexInDocument?: number;
-  createdAt: number;
+  index: number;
 }
 
-export interface Device {
-  _id: ID;
-  _creationTime: number;
-  fingerprint: string;
-  userId?: string;
-  createdAt: number;
-}
+// ─── Auth ────────────────────────────────────────────────────────────────────
 
-// ---------------------------------------------------------------------------
-// Input shapes (mirrors Convex mutation args)
-// ---------------------------------------------------------------------------
-
-export interface SignInWithPasswordArgs {
-  email: string;
-  password: string;
-  /** 'password' provider flow: 'signIn' | 'signUp' */
+export interface SignInParams {
   flow: 'signIn' | 'signUp';
-  fingerprint?: string;
-  loginType?: string;
-  username?: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-}
-
-export interface SignInAnonymousArgs {
+  password: string;
+  username: string;
+  email: string;
   fingerprint: string;
 }
 
-export interface SaveTranscriptionArgs {
-  text: string;
-  audioStorageId: string;
-  documentId: string;
-  index?: number;
+export interface SignInResult {
+  redirect?: string;
+  verifier?: string;
+  [key: string]: unknown;
 }
 
-export interface SetCurrentDocIdArgs {
+// ─── Storage ─────────────────────────────────────────────────────────────────
+
+export interface GenerateUploadUrlResult {
+  uploadUrl: string;
+}
+
+// ─── Transcribe ──────────────────────────────────────────────────────────────
+
+export interface TranscribeAudioParams {
+  storageId: string;
+}
+
+export interface SaveTranscriptionParams {
+  audioStorageId: string;
+  text: string;
+  documentId: string;
+  index: number;
+}
+
+export interface SetCurrentDocIdParams {
   userId: string;
   docId: string;
 }
 
-export interface UpdateDeviceWithUserIdArgs {
-  fingerprint: string;
+export interface GetDocumentsByUserParams {
   userId: string;
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
-/** Call to stop a real-time subscription. */
-export type Unsubscribe = () => void;
+export interface GetDocumentByIdParams {
+  documentId: string;
+}
